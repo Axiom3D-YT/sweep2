@@ -1,0 +1,6 @@
+node_modules
+dist
+sweep.db
+.env
+.git
+*.log

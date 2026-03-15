@@ -15,11 +15,23 @@ Before you begin, ensure you have the following:
 ## 2. Configuration Files
 
 ### A. Environment Variables (`.env`)
-Create a `.env` file in the project root with the following variables:
+Create a `.env` file in the project root with the following variables. These are used to configure both the AI analysis and the Firebase Authentication.
+
+**Note**: These variables are fetched at runtime from the server, so you can change them in your Docker environment without rebuilding the image.
 
 ```env
 # Google Gemini API Key (Required for Cloud Run mode)
 GEMINI_API_KEY=your_gemini_api_key_here
+
+# Firebase Configuration (Required for Google Login)
+# You can find these in your Firebase Console > Project Settings
+VITE_FIREBASE_API_KEY=your_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+VITE_FIREBASE_FIRESTORE_DATABASE_ID=(default)
 
 # Port for the application (Default is 3000)
 PORT=3000
@@ -28,8 +40,8 @@ PORT=3000
 NODE_ENV=production
 ```
 
-### B. Firebase Configuration (`src/firebase-applet-config.json`)
-Ensure your Firebase configuration is present at `src/firebase-applet-config.json`. This is required for the Google Login to function.
+### B. Alternative: Firebase JSON File
+If you prefer not to use environment variables for Firebase, you can instead ensure your configuration is present at `src/firebase-applet-config.json`. The app will check environment variables first and fallback to this file if they are missing.
 
 ```json
 {

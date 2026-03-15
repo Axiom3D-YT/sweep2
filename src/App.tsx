@@ -27,7 +27,7 @@ import {
   Infinity as InfinityIcon
 } from "lucide-react";
 import { GoogleGenAI } from "@google/genai";
-import { auth, googleProvider, db } from "./firebase";
+import { auth, googleProvider, db, firebaseReady } from "./firebase";
 import { 
   signInWithPopup, 
   signOut, 
@@ -248,19 +248,27 @@ function SweepApp() {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setIsAuthReady(true);
-      if (user) {
-        loadAvailableJobs(user.uid);
-      } else {
-        setAccessToken(null);
-        setEmails([]);
-        setAvailableJobs([]);
-        setActiveJob(null);
-      }
+    let unsubscribe: (() => void) | undefined;
+    
+    firebaseReady.then(({ auth }) => {
+      unsubscribe = onAuthStateChanged(auth, (user) => {
+        setUser(user);
+        setIsAuthReady(true);
+        if (user) {
+          loadAvailableJobs(user.uid);
+        } else {
+          setAccessToken(null);
+          setEmails([]);
+          setAvailableJobs([]);
+          setActiveJob(null);
+        }
+      });
+    }).catch(err => {
+      console.error("Firebase failed to initialize", err);
+      setIsAuthReady(true); // Allow app to show error state
     });
-    return () => unsubscribe();
+
+    return () => unsubscribe?.();
   }, []);
 
   const loadAvailableJobs = async (uid: string) => {
@@ -463,7 +471,11 @@ function SweepApp() {
 
   const startDownload = async (job?: SweepJob) => {
     const targetJob = job || activeJob;
-    if (!targetJob || !accessToken) return;
+    console.log("[DEBUG] Starting download for job:", targetJob?.id);
+    if (!targetJob || !accessToken) {
+      console.log("[DEBUG] Aborting download: targetJob or accessToken missing", { targetJob: !!targetJob, accessToken: !!accessToken });
+      return;
+    }
     setDownloading(true);
     setIsStoppingDownload(false);
     
@@ -515,6 +527,7 @@ function SweepApp() {
   };
 
   const runDownloadLoop = async (jobId: string, pageToken?: string) => {
+    console.log("[DEBUG] runDownloadLoop started", { jobId, pageToken });
     let currentToken = pageToken;
     const startTime = Date.now();
     const MAX_DURATION = 30 * 60 * 1000;
@@ -522,6 +535,7 @@ function SweepApp() {
     while (true) {
       const timeLimitReached = !disableTimeLimitRef.current && (Date.now() - startTime > MAX_DURATION);
       if (isStoppingDownloadRef.current || timeLimitReached) {
+        console.log("[DEBUG] Download loop stopping", { isStopping: isStoppingDownloadRef.current, timeLimitReached });
         if (localRunRef.current) {
           await fetch(`/api/jobs/${jobId}`, {
             method: "PATCH",
@@ -545,6 +559,7 @@ function SweepApp() {
       }
 
       try {
+        console.log("[DEBUG] Fetching messages from Gmail API", { currentToken });
         const url = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages");
         url.searchParams.append("maxResults", "50");
         
@@ -564,8 +579,10 @@ function SweepApp() {
         const data = await response.json();
         const messages = data.messages || [];
         currentToken = data.nextPageToken;
+        console.log(`[DEBUG] Fetched ${messages.length} messages. Next page token: ${currentToken}`);
 
         if (messages.length === 0) {
+          console.log("[DEBUG] No more messages found. Completing job.");
           const now = new Date().toISOString();
           if (localRunRef.current) {
             await fetch(`/api/jobs/${jobId}`, {
@@ -591,6 +608,7 @@ function SweepApp() {
 
         const details: any[] = [];
         const detailBatchSize = 10;
+        console.log(`[DEBUG] Fetching details for ${messages.length} messages in batches of ${detailBatchSize}`);
         for (let i = 0; i < messages.length; i += detailBatchSize) {
           const batch = messages.slice(i, i + detailBatchSize);
           const batchDetails = await Promise.all(
@@ -621,6 +639,7 @@ function SweepApp() {
         }
 
         if (localRunRef.current) {
+          console.log(`[DEBUG] Sending batch of ${details.length} emails to server for job ${jobId}`);
           await fetch("/api/emails/batch", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -658,7 +677,7 @@ function SweepApp() {
         } : null);
 
       } catch (err) {
-        console.error("Download error", err);
+        console.error("[DEBUG] Download loop encountered a fatal error and will stop:", err);
         setDownloading(false);
         break;
       }
