@@ -8,7 +8,8 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const dbPath = process.env.DATABASE_PATH || "sweep.db";
+const dbPath = process.env.DATABASE_PATH || "/app/data/sweep.db";
+fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new Database(dbPath);
 
 // Initialize Database
@@ -43,16 +44,10 @@ try { db.exec("ALTER TABLE emails ADD COLUMN analyze_count INTEGER DEFAULT 0;");
 try { db.exec("ALTER TABLE users ADD COLUMN last_history_id TEXT;"); } catch (e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN allowed_folders TEXT;"); } catch (e) {}
 try { db.exec("ALTER TABLE emails ADD COLUMN labels TEXT;"); } catch (e) {}
-// Drop jobs table if it exists
-try { db.exec("DROP TABLE IF EXISTS jobs;"); } catch(e) {}
-// Drop jobs table if it exists
-try {
-  db.exec("DROP TABLE IF EXISTS jobs;");
-} catch(e) {}
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
 
   app.use(cors());
   app.use(express.json({ limit: '50mb' }));
@@ -292,6 +287,10 @@ async function startServer() {
     });
   });
 
+  app.get("/api/health", (_req, res) => {
+    res.json({ ok: true });
+  });
+
   app.get("/api/prompt", (req, res) => {
     try {
       const content = fs.readFileSync(path.join(process.cwd(), "prompt.md"), "utf-8");
@@ -328,7 +327,10 @@ async function startServer() {
 
   app.get("/api/config", (req, res) => {
     res.json({
-      geminiApiKey: process.env.GEMINI_API_KEY,
+      localLlm: {
+        endpoint: process.env.LOCAL_LLM_ENDPOINT || "",
+        model: process.env.LOCAL_LLM_MODEL || ""
+      },
       firebase: {
         apiKey: process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY,
         authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN,

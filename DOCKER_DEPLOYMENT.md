@@ -8,7 +8,7 @@ Before you begin, ensure you have the following:
 - **Docker** installed on your machine.
 - **Google Cloud Console Credentials**: A Client ID and Client Secret for Gmail API access.
 - **Firebase Project**: A configuration for Google Authentication.
-- **Google AI Studio API Key**: For Gemini-powered analysis (optional if using a local LLM).
+- **Google AI Studio API Key**: For local LLM-powered analysis (optional if using a local LLM).
 
 ---
 
@@ -20,8 +20,9 @@ Create a `.env` file in the project root with the following variables. These are
 **Note**: These variables are fetched at runtime from the server, so you can change them in your Docker environment without rebuilding the image.
 
 ```env
-# Google Gemini API Key (Required for Cloud Run mode)
-GEMINI_API_KEY=your_gemini_api_key_here
+# Google local LLM API Key (Required for Cloud Run mode)
+LOCAL_LLM_ENDPOINT=http://host.docker.internal:11434/api/generate
+LOCAL_LLM_MODEL=llama3
 
 # Firebase Configuration (Required for Google Login)
 # You can find these in your Firebase Console > Project Settings
@@ -41,7 +42,7 @@ NODE_ENV=production
 ```
 
 ### B. Alternative: Firebase JSON File
-If you prefer not to use environment variables for Firebase, you can instead ensure your configuration is present at `src/firebase-applet-config.json`. The app will check environment variables first and fallback to this file if they are missing.
+Do not commit Firebase configuration files. Provide Firebase values through environment variables only.
 
 ```json
 {
@@ -69,7 +70,7 @@ docker build -t sweep-cleaner .
 ## 4. Running the Container
 
 ### Standard Run (Cloud Mode)
-To run the container using the cloud-based Gemini AI and local SQLite storage:
+To run the container using the cloud-based local LLM AI and local SQLite storage:
 
 ```bash
 docker run -d \

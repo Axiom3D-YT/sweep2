@@ -7,13 +7,11 @@ import {
   ArrowUpRight, Infinity as InfinityIcon, Eye, Filter, PlayCircle, Calendar,
   LayoutGrid, List, Check, X, Layers
 } from "lucide-react";
-import { GoogleGenAI } from "@google/genai";
 import { auth, googleProvider, firebaseReady } from "./firebase";
 import { 
   signInWithPopup, signOut, onAuthStateChanged, GoogleAuthProvider, UserCredential
 } from "firebase/auth";
 
-let ai: GoogleGenAI | null = null;
 
 interface Email {
   id: string;
@@ -60,7 +58,7 @@ function SweepApp() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   
   // Settings
-  const [localLlmEnabled, setLocalLlmEnabled] = useState(() => localStorage.getItem('localLlmEnabled') === 'true');
+  const [localLlmEnabled, setLocalLlmEnabled] = useState(true);
   const [localLlmEndpoint, setLocalLlmEndpoint] = useState(() => localStorage.getItem('localLlmEndpoint') || 'http://localhost:11434/api/generate');
   const [localLlmModel, setLocalLlmModel] = useState(() => localStorage.getItem('localLlmModel') || 'llama3');
   const [demoMode, setDemoMode] = useState(() => localStorage.getItem('demoMode') === 'true');
@@ -109,6 +107,14 @@ function SweepApp() {
     localStorage.setItem('localLlmEnabled', String(localLlmEnabled));
     localLlmEnabledRef.current = localLlmEnabled;
   }, [localLlmEnabled]);
+  useEffect(() => {
+    localStorage.setItem('localLlmEndpoint', localLlmEndpoint);
+    localLlmEndpointRef.current = localLlmEndpoint;
+  }, [localLlmEndpoint]);
+  useEffect(() => {
+    localStorage.setItem('localLlmModel', localLlmModel);
+    localLlmModelRef.current = localLlmModel;
+  }, [localLlmModel]);
   useEffect(() => {
     localStorage.setItem('batchSize', String(batchSize));
     batchSizeRef.current = batchSize;
@@ -435,29 +441,32 @@ function SweepApp() {
       })), null, 2));
 
     let results: any[] = [];
-    if (!localLlmEnabledRef.current && !ai) {
-      const configRes = await fetch("/api/config");
-      const config = await configRes.json();
-      if (config.geminiApiKey) ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
-    }
 
     try {
-      let text = "";
-      if (localLlmEnabledRef.current) {
-        const response = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            endpoint: localLlmEndpointRef.current,
-            body: { model: localLlmModelRef.current, prompt: prompt + "\n\nReturn JSON array.", stream: false, format: "json" }
-          })
-        });
-        const data = await response.json();
-        text = data.content || data.response || data.message?.content || "";
-      } else {
-        const res = await ai!.models.generateContent({ model: "gemini-1.5-flash", contents: prompt, config: { responseMimeType: "application/json" } });
-        text = res.text || "";
+      let endpoint = localLlmEndpointRef.current;
+      let model = localLlmModelRef.current;
+
+      if (!endpoint || !model) {
+        const configRes = await fetch("/api/config");
+        const config = await configRes.json();
+        endpoint = endpoint || config.localLlm?.endpoint || "";
+        model = model || config.localLlm?.model || "";
       }
+
+      if (!endpoint || !model) {
+        throw new Error("Local LLM (required) is not configured. Set endpoint and model in Settings or server env.");
+      }
+
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint,
+          body: { model, prompt: prompt + "\n\nReturn JSON array.", stream: false, format: "json" }
+        })
+      });
+      const data = await response.json();
+      const text = data.content || data.response || data.message?.content || data.choices?.[0]?.message?.content || "";
 
       // Robust JSON extraction: Find the first [ and last ]
       const start = text.indexOf('[');
@@ -694,7 +703,7 @@ function SweepApp() {
                 </div>
 
                 <div className="p-6 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-4">
-                  <div className="flex items-center gap-3"><Cpu className="w-5 h-5 text-emerald-500" /><h4 className="font-bold">Local LLM</h4></div>
+                  <div className="flex items-center gap-3"><Cpu className="w-5 h-5 text-emerald-500" /><h4 className="font-bold">Local LLM (required)</h4></div>
                   <input id="llm-endpoint" type="text" value={localLlmEndpoint} onChange={e => setLocalLlmEndpoint(e.target.value)} placeholder="Endpoint URL" className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 text-xs outline-none" />
                   <input id="llm-model" type="text" value={localLlmModel} onChange={e => setLocalLlmModel(e.target.value)} placeholder="Model Name" className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 text-xs outline-none" />
                 </div>
