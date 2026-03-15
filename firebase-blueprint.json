@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "userProfile": {
+      "title": "User Profile",
+      "description": "Stores user preferences and sweep history.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "lastSweep": { "type": "string", "format": "date-time" },
+        "totalCleaned": { "type": "integer" }
+      },
+      "required": ["uid", "email"]
+    },
+    "sweepJob": {
+      "title": "Sweep Job",
+      "description": "Represents a long-running inbox analysis task.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "status": { "type": "string", "enum": ["running", "paused", "completed"] },
+        "lastPageToken": { "type": "string" },
+        "processedCount": { "type": "integer" },
+        "rubbishCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "status", "createdAt"]
+    },
+    "processedEmail": {
+      "title": "Processed Email",
+      "description": "An email analyzed by AI within a job.",
+      "type": "object",
+      "properties": {
+        "jobId": { "type": "string" },
+        "uid": { "type": "string" },
+        "emailId": { "type": "string" },
+        "sender": { "type": "string" },
+        "subject": { "type": "string" },
+        "snippet": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "isRubbish": { "type": "boolean" },
+        "reason": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["jobId", "uid", "emailId", "isRubbish"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "userProfile",
+      "description": "User-specific data."
+    },
+    "/jobs/{jobId}": {
+      "schema": "sweepJob",
+      "description": "Analysis jobs."
+    },
+    "/processed_emails/{emailId}": {
+      "schema": "processedEmail",
+      "description": "Results of analysis."
+    }
+  }
+}

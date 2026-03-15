@@ -1,0 +1,5 @@
+{
+  "name": "Gmail Sweep",
+  "description": "AI-powered Gmail cleaner that identifies and removes spam and clutter using Gemini.",
+  "requestFramePermissions": []
+}

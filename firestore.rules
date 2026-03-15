@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    function isDocOwner() {
+      return isAuthenticated() && resource != null && request.auth.uid == resource.data.uid;
+    }
+    function isRequestOwner() {
+      return isAuthenticated() && request.resource != null && request.auth.uid == request.resource.data.uid;
+    }
+
+    // ===============================================================
+    // Validation Functions
+    // ===============================================================
+    function isValidJob(data) {
+      return data.uid is string &&
+             data.status in ['running', 'paused', 'completed'] &&
+             data.createdAt is string;
+    }
+
+    function isValidProcessedEmail(data) {
+      return data.jobId is string &&
+             data.uid is string &&
+             data.emailId is string &&
+             data.isRubbish is bool;
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /jobs/{jobId} {
+      allow read: if isDocOwner();
+      allow create: if isRequestOwner() && isValidJob(request.resource.data);
+      allow update: if isDocOwner() && isRequestOwner() && isValidJob(request.resource.data);
+      allow delete: if isDocOwner();
+    }
+
+    match /processed_emails/{emailId} {
+      allow read: if isDocOwner();
+      allow create: if isRequestOwner() && isValidProcessedEmail(request.resource.data);
+      allow update: if isDocOwner() && isRequestOwner() && isValidProcessedEmail(request.resource.data);
+      allow delete: if isDocOwner();
+    }
+  }
+}
