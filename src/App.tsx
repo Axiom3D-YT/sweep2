@@ -514,7 +514,9 @@ function SweepApp() {
         fetchStats(result.user.uid);
         fetchLiveEmails(null);
       }
-    } catch (err) {}
+    } catch (err) {
+      console.error("Login failed:", err);
+    }
   };
 
   const handleLogout = async () => { await signOut(auth); setAccessToken(null); setProcessedEmails([]); setIsSyncing(false); setIsAnalyzing(false); };
